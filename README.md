@@ -33,7 +33,6 @@ Double-cliquez sur `index.html`
 
 ### Avec serveur local
 
-```bash
 # Cloner le repo
 git clone https://github.com/intello-agence/ecommerce-platform-prototype.git
 cd ecommerce-platform-prototype
@@ -103,3 +102,4 @@ Si ce prototype vous a été utile :
 🐦 Partager sur LinkedIn/Twitter
 📧 Nous contacter pour un projet sur mesure
 Fait par Intello
+```bash
