@@ -1,6 +1,13 @@
+# ✅ README.md corrigé et optimisé
+
+**Remplace tout le contenu de `README.md` par ceci :**
+
+```markdown
 # 🛍️ E-Commerce Platform Premium
 
 Plateforme e-commerce moderne avec panier, wishlist et filtres avancés — Prototype premium par [Intello](https://intello.sn).
+
+![Interface E-commerce](screenshots/interface-ecommerce.png)
 
 ---
 
@@ -19,20 +26,21 @@ Plateforme e-commerce moderne avec panier, wishlist et filtres avancés — Prot
 
 ## 🛠️ Stack technique
 
-- HTML5 + CSS3 (variables, gradients, animations)
-- JavaScript ES6+ vanilla (state management)
-- 20 produits fictifs avec descriptions
-- Modals accessibles (Escape to close)
+- **HTML5 + CSS3** : Variables, gradients, animations
+- **JavaScript ES6+** : Vanilla (state management)
+- **20 produits** : Données fictives avec descriptions
+- **Accessibilité** : Modals (Escape to close)
 
 ---
 
 ## 🚀 Installation
 
-### Ouvrir directement
+### Option 1 : Ouverture directe
 Double-cliquez sur `index.html`
 
-### Avec serveur local
+### Option 2 : Serveur local
 
+```bash
 # Cloner le repo
 git clone https://github.com/intello-agence/ecommerce-platform-prototype.git
 cd ecommerce-platform-prototype
@@ -42,64 +50,102 @@ python -m http.server 8000
 # OU
 npx http-server -p 8000
 # OU utiliser l'extension "Live Server" de VS Code
-Puis ouvrir http://localhost:8000
+```
+
+Puis ouvrir **http://localhost:8000**
+
+---
 
 ## 📸 Screenshots
 
 ### Interface principale
 ![Interface E-commerce](screenshots/interface-ecommerce.png)
 
-### Grille produits
+### Grille produits avec filtres
 ![Produits](screenshots/produits.png)
 
-📦 Structure
-text
+---
 
+## 📦 Structure
+
+```
 ecommerce-platform-prototype/
 ├── index.html          # Structure HTML
 ├── styles.css          # Styles (glassmorphism, animations)
 ├── app.js              # Logique panier + filtres
 ├── screenshots/        # Captures d'écran
-│   ├── interface e-commerce.png
+│   ├── interface-ecommerce.png
 │   └── produits.png
 └── README.md           # Documentation
+```
 
-🎮 Utilisation
-Fonctionnalités principales
-Filtres catégories : Mode / Tech / Maison / Sport (multi-sélection)
-Budget : Tranches de prix 0-20k, 20-50k, 50-100k, 100k+
-Stock : Afficher uniquement produits disponibles
-Tri : Mis en avant, prix croissant/décroissant, nouveautés
-Recherche : Filtrage instantané par nom
-Actions utilisateur
-❤️ Wishlist : Cliquer sur l'icône cœur
-🛒 Panier : Ajouter produits, ajuster quantités (+/−)
-👁️ Détails : Modal avec description complète
-💳 Checkout : Validation panier (simulé)
-🎨 Personnalisation
-Les produits sont définis dans app.js (tableau PRODUCTS). Pour connecter une API :
+---
 
-JavaScript
+## 🎮 Utilisation
 
+### Fonctionnalités principales
+
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Filtres catégories** | Mode / Tech / Maison / Sport (multi-sélection) |
+| **Budget** | Tranches de prix 0-20k, 20-50k, 50-100k, 100k+ |
+| **Stock** | Afficher uniquement produits disponibles |
+| **Tri** | Mis en avant, prix croissant/décroissant, nouveautés |
+| **Recherche** | Filtrage instantané par nom |
+
+### Actions utilisateur
+
+- **❤️ Wishlist** : Cliquer sur l'icône cœur
+- **🛒 Panier** : Ajouter produits, ajuster quantités (+/−)
+- **👁️ Détails** : Modal avec description complète
+- **💳 Checkout** : Validation panier (simulé)
+
+---
+
+## 🎨 Personnalisation
+
+Les produits sont définis dans `app.js` (tableau `PRODUCTS`).  
+Pour connecter une API réelle :
+
+```javascript
 // Remplacer PRODUCTS par :
 async function fetchProducts() {
   const res = await fetch('/api/products');
   return res.json();
 }
-📄 Licence
-MIT License
+```
 
-👤 Auteur
-Intello — Agence digitale Dakar 🇸🇳
+---
 
-🌐 intello.sn
-📧 contact@intello.sn
-📱 +221 77 553 28 04
-⭐ Support
+## 📄 Licence
+
+MIT License — Libre d'utilisation commerciale et personnelle.
+
+---
+
+## 👤 Auteur
+
+**Intello** — Agence digitale Dakar 🇸🇳
+
+- 🌐 Site : [intello.sn](https://intello.sn)
+- 📧 Email : contact@intello.sn
+- 📱 WhatsApp : +221 77 553 28 04
+- 💼 GitHub : [@intello-agence](https://github.com/intello-agence)
+
+---
+
+## ⭐ Support
+
 Si ce prototype vous a été utile :
 
-⭐ Star le repo
-🐦 Partager sur LinkedIn/Twitter
-📧 Nous contacter pour un projet sur mesure
-Fait par Intello
-```bash
+- ⭐ **Star** le repo
+- 🐦 Partager sur [LinkedIn](https://linkedin.com/company/intello-agence) / Twitter
+- 📧 Nous contacter pour un projet sur mesure
+
+---
+
+**Fait avec passion à Dakar par [Intello](https://intello.sn)**
+```
+
+---
+
