@@ -45,6 +45,14 @@ npx http-server -p 8000
 # OU utiliser l'extension "Live Server" de VS Code
 Puis ouvrir http://localhost:8000
 
+## 📸 Screenshots
+
+### Interface principale
+![Interface E-commerce](screenshots/interface-ecommerce.png)
+
+### Grille produits
+![Produits](screenshots/produits.png)
+
 📦 Structure
 text
 
