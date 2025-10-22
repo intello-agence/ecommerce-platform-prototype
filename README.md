@@ -111,10 +111,10 @@ Intello Shop est une plateforme e-commerce fictive présentant :
 ## 🖼️ Screenshots
 
 ### Catalogue Principal (Filtres + Produits)
-![Shop Main](./screenshots/shop_main.png)
+![Shop Main](./screenshots/interface-ecommerce.png)
 
 ### Modal Panier (Items + Total + Checkout)
-![Cart Modal](./screenshots/cart_modal.png)
+![Cart Modal](./screenshots/produits.png)
 
 ---
 
