@@ -1,28 +1,154 @@
-// public/prototypes/ecommerce-platform/app.js
-// E-Commerce Platform Premium — Intello
+/*
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ E-COMMERCE PLATFORM - APP.JS                                                ║
+║──────────────────────────────────────────────────────────────────────────────║
+║ Description : Application e-commerce interactive avec panier et wishlist    ║
+║               • Catalogue : 20 produits fictifs (Mode, Tech, Maison, Sport)  ║
+║               • Panier : ajout/retrait, gestion quantités, total dynamique   ║
+║               • Wishlist : favoris persistants (localStorage future)         ║
+║               • Filtres : catégorie, prix, stock, recherche live             ║
+║               • Tri : featured, prix (asc/desc), nouveautés                  ║
+║               • Modals : détail produit, panier, checkout                    ║
+║──────────────────────────────────────────────────────────────────────────────║
+║ Auteur      : Patrick Junior Samba Ntadi (Intello)                           ║
+║ Date        : Janvier 2025                                                   ║
+║ Stack       : Vanilla JavaScript ES6+ (IIFE, strict mode)                    ║
+║ Dépendances : Aucune (vanilla JS pur)                                        ║
+║──────────────────────────────────────────────────────────────────────────────║
+║ Structure :                                                                  ║
+║  1. Utilitaires & Helpers (DOM, formatage, sécurité)                         ║
+║  2. État global (produits, panier, wishlist, filtres)                        ║
+║  3. Données produits (20 items fictifs)                                      ║
+║  4. Gestion panier (ajout, retrait, quantités, total)                        ║
+║  5. Gestion wishlist (toggle favoris)                                        ║
+║  6. Filtres & Recherche (catégorie, prix, stock, tri)                        ║
+║  7. Rendu produits (grille)                                                  ║
+║  8. Modals (détail produit, panier)                                          ║
+║  9. Événements & Init                                                        ║
+║──────────────────────────────────────────────────────────────────────────────║
+║ Sécurité : Validation inputs + escapeHTML pour prévenir XSS.                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+*/
 
 (() => {
   'use strict';
 
-  const $ = (s) => document.querySelector(s);
-  const $$ = (s) => Array.from(document.querySelectorAll(s));
+  // ═══════════════════════════════════════════════════════════════════════
+  // 1. UTILITAIRES & HELPERS
+  // ═══════════════════════════════════════════════════════════════════════
 
-  /* ==================== STATE ==================== */
+  /**
+   * Sélecteur DOM raccourci (retourne le premier élément trouvé)
+   * @param {string} selector - Sélecteur CSS
+   * @returns {Element|null}
+   */
+  const $ = (selector) => document.querySelector(selector);
+
+  /**
+   * Sélecteur DOM raccourci (retourne un tableau de tous les éléments)
+   * @param {string} selector - Sélecteur CSS
+   * @returns {Array<Element>}
+   */
+  const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+  /**
+   * Échappe HTML pour prévenir XSS lors de l'injection dans innerHTML
+   * @param {string} unsafe - Chaîne non sécurisée
+   * @returns {string} Chaîne échappée
+   */
+  const escapeHTML = (unsafe) => {
+    if (typeof unsafe !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = unsafe;
+    return div.innerHTML;
+  };
+
+  /**
+   * Formate un prix en francs CFA (FCFA) avec séparateurs de milliers
+   * @param {number} price - Prix en FCFA
+   * @returns {string} Ex: "45 990 FCFA"
+   */
+  const formatPrice = (price) => {
+    return `${price.toLocaleString('fr-FR')} FCFA`;
+  };
+
+  /**
+   * Retourne le label français d'une catégorie
+   * @param {string} category - Catégorie (mode, tech, maison, sport)
+   * @returns {string} Label traduit
+   */
+  const getCategoryLabel = (category) => {
+    const labels = {
+      mode: 'Mode',
+      tech: 'Tech',
+      maison: 'Maison',
+      sport: 'Sport'
+    };
+    return labels[category] || category;
+  };
+
+  /**
+   * Affiche une notification toast temporaire
+   * @param {string} message - Message à afficher
+   * @param {string} type - Type de toast : 'success' ou 'error'
+   */
+  const showToast = (message, type = 'success') => {
+    const container = $('#toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = escapeHTML(message);
+    container.appendChild(toast);
+
+    // Auto-suppression après 3s
+    setTimeout(() => {
+      toast.remove();
+    }, 3000);
+  };
+
+  /**
+   * Debounce : retarde l'exécution d'une fonction jusqu'à ce que X ms se soient écoulées
+   * @param {Function} func - Fonction à débouncer
+   * @param {number} wait - Délai en ms
+   * @returns {Function}
+   */
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 2. ÉTAT GLOBAL
+  // Centralisation des données de l'application
+  // ═══════════════════════════════════════════════════════════════════════
+
   const state = {
-    products: [],
-    filteredProducts: [],
-    cart: [],
-    wishlist: [],
+    products: [],              // Tous les produits (source de vérité)
+    filteredProducts: [],      // Produits après filtres/tri
+    cart: [],                  // Panier [{...product, qty: Number}]
+    wishlist: [],              // Favoris [productId, ...]
     filters: {
-      categories: [],
-      priceRange: '',
-      inStockOnly: false,
-      search: '',
-      sort: 'featured'
+      categories: [],          // Catégories sélectionnées
+      priceRange: '',          // Range prix (ex: "0-19999" ou "100000+")
+      inStockOnly: false,      // Afficher uniquement produits en stock
+      search: '',              // Recherche textuelle
+      sort: 'featured'         // Tri actif (featured, price-asc, price-desc, newest)
     }
   };
 
-  /* ==================== DATA ==================== */
+  // ═══════════════════════════════════════════════════════════════════════
+  // 3. DONNÉES PRODUITS
+  // 20 produits fictifs (Mode, Tech, Maison, Sport)
+  // ═══════════════════════════════════════════════════════════════════════
+
   const PRODUCTS = [
     { id: 1, name: 'Sneakers Premium Sport', category: 'mode', price: 45990, stock: 12, emoji: '👟', featured: true, new: false, desc: 'Baskets haute performance avec amorti supérieur. Parfaites pour le running et la marche quotidienne.' },
     { id: 2, name: 'Montre Connectée Elite', category: 'tech', price: 89990, stock: 8, emoji: '⌚', featured: true, new: true, desc: 'Montre intelligente avec suivi santé 24/7, GPS intégré et autonomie 7 jours.' },
@@ -46,292 +172,479 @@
     { id: 20, name: 'Corde à Sauter Pro', category: 'sport', price: 7990, stock: 35, emoji: '🪢', featured: false, new: false, desc: 'Corde ajustable avec roulements à billes et poignées ergonomiques.' }
   ];
 
-  /* ==================== HELPERS ==================== */
-  const formatPrice = (price) => `${price.toLocaleString('fr-FR')} FCFA`;
+  // ═══════════════════════════════════════════════════════════════════════
+  // 4. GESTION PANIER
+  // Ajout, retrait, mise à jour quantités, calcul total
+  // ═══════════════════════════════════════════════════════════════════════
 
-  const getCategoryLabel = (cat) => {
-    const labels = { mode: 'Mode', tech: 'Tech', maison: 'Maison', sport: 'Sport' };
-    return labels[cat] || cat;
-  };
-
-  function showToast(message, type = 'success') {
-    const container = $('#toastContainer');
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    container.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-  }
-
-  /* ==================== CART MANAGEMENT ==================== */
-  function addToCart(productId) {
-    const product = state.products.find(p => p.id === productId);
+  /**
+   * Ajoute un produit au panier (ou incrémente quantité si déjà présent)
+   * @param {number} productId - ID du produit
+   */
+  const addToCart = (productId) => {
+    const product = state.products.find((p) => p.id === productId);
     if (!product || product.stock === 0) return;
 
-    const existing = state.cart.find(item => item.id === productId);
-    if (existing) {
-      if (existing.qty < product.stock) {
-        existing.qty++;
+    const existingItem = state.cart.find((item) => item.id === productId);
+
+    if (existingItem) {
+      // Produit déjà dans le panier : incrémenter quantité
+      if (existingItem.qty < product.stock) {
+        existingItem.qty++;
         showToast('Quantité mise à jour', 'success');
       } else {
         showToast('Stock limité atteint', 'error');
         return;
       }
     } else {
+      // Nouveau produit : ajouter au panier avec qty = 1
       state.cart.push({ ...product, qty: 1 });
       showToast(`${product.name} ajouté au panier`, 'success');
     }
-    updateUI();
-  }
 
-  function removeFromCart(productId) {
-    state.cart = state.cart.filter(item => item.id !== productId);
-    updateUI();
+    updateUICounters();
+  };
+
+  /**
+   * Retire un produit du panier
+   * @param {number} productId - ID du produit
+   */
+  const removeFromCart = (productId) => {
+    state.cart = state.cart.filter((item) => item.id !== productId);
+    updateUICounters();
     renderCart();
-  }
+  };
 
-  function updateCartQty(productId, delta) {
-    const item = state.cart.find(i => i.id === productId);
+  /**
+   * Met à jour la quantité d'un produit dans le panier
+   * @param {number} productId - ID du produit
+   * @param {number} delta - Variation (+1 ou -1)
+   */
+  const updateCartQty = (productId, delta) => {
+    const item = state.cart.find((i) => i.id === productId);
     if (!item) return;
 
-    const product = state.products.find(p => p.id === productId);
+    const product = state.products.find((p) => p.id === productId);
     const newQty = item.qty + delta;
 
     if (newQty <= 0) {
+      // Quantité = 0 → retirer du panier
       removeFromCart(productId);
     } else if (newQty <= product.stock) {
+      // Quantité valide : mettre à jour
       item.qty = newQty;
-      updateUI();
+      updateUICounters();
       renderCart();
     } else {
+      // Stock insuffisant
       showToast('Stock insuffisant', 'error');
     }
-  }
+  };
 
-  function getCartTotal() {
-    return state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  }
+  /**
+   * Calcule le total du panier (prix × quantité pour chaque item)
+   * @returns {number} Total en FCFA
+   */
+  const getCartTotal = () => {
+    return state.cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  };
 
-  /* ==================== WISHLIST ==================== */
-  function toggleWishlist(productId) {
-    const idx = state.wishlist.indexOf(productId);
-    if (idx > -1) {
-      state.wishlist.splice(idx, 1);
+  // ═══════════════════════════════════════════════════════════════════════
+  // 5. GESTION WISHLIST
+  // Toggle favoris (ajout/retrait)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Ajoute ou retire un produit des favoris (toggle)
+   * @param {number} productId - ID du produit
+   */
+  const toggleWishlist = (productId) => {
+    const index = state.wishlist.indexOf(productId);
+
+    if (index > -1) {
+      // Déjà dans wishlist → retirer
+      state.wishlist.splice(index, 1);
       showToast('Retiré des favoris', 'success');
     } else {
+      // Pas dans wishlist → ajouter
       state.wishlist.push(productId);
       showToast('Ajouté aux favoris ❤️', 'success');
     }
-    updateUI();
+
+    updateUICounters();
     renderProducts();
-  }
+  };
 
-  /* ==================== UI UPDATES ==================== */
-  function updateUI() {
-    const cartCount = $('#cartCount');
-    const wishlistCount = $('#wishlistCount');
+  // ═══════════════════════════════════════════════════════════════════════
+  // 6. FILTRES & RECHERCHE
+  // Catégorie, prix, stock, recherche textuelle, tri
+  // ═══════════════════════════════════════════════════════════════════════
 
-    const totalItems = state.cart.reduce((sum, item) => sum + item.qty, 0);
-    if (cartCount) cartCount.textContent = totalItems;
-    if (wishlistCount) wishlistCount.textContent = state.wishlist.length;
-  }
-
-  /* ==================== FILTERS ==================== */
-  function handleSearch(e) {
-    state.filters.search = e.target.value.toLowerCase();
+  /**
+   * Gère la recherche textuelle (debounced)
+   * @param {Event} event - Événement input
+   */
+  const handleSearch = (event) => {
+    state.filters.search = event.target.value.trim().toLowerCase();
     applyFilters();
-  }
+  };
 
-  function handleCategoryFilter() {
-    const checked = $$('#categoryFilters input[type="checkbox"]:checked');
-    state.filters.categories = checked.map(cb => cb.value);
+  /**
+   * Gère le filtre catégories (checkboxes)
+   */
+  const handleCategoryFilter = () => {
+    const checkedBoxes = $$('#categoryFilters input[type="checkbox"]:checked');
+    state.filters.categories = checkedBoxes.map((checkbox) => checkbox.value);
     applyFilters();
-  }
+  };
 
-  function handlePriceFilter(e) {
-    state.filters.priceRange = e.target.value;
+  /**
+   * Gère le filtre prix (select)
+   * @param {Event} event - Événement change
+   */
+  const handlePriceFilter = (event) => {
+    state.filters.priceRange = event.target.value;
     applyFilters();
-  }
+  };
 
-  function handleStockFilter(e) {
-    state.filters.inStockOnly = e.target.checked;
+  /**
+   * Gère le filtre "en stock uniquement" (checkbox)
+   * @param {Event} event - Événement change
+   */
+  const handleStockFilter = (event) => {
+    state.filters.inStockOnly = event.target.checked;
     applyFilters();
-  }
+  };
 
-  function handleSort(e) {
-    state.filters.sort = e.target.value;
+  /**
+   * Gère le tri (select)
+   * @param {Event} event - Événement change
+   */
+  const handleSort = (event) => {
+    state.filters.sort = event.target.value;
     applyFilters();
-  }
+  };
 
-  function resetFilters() {
-    state.filters = { categories: [], priceRange: '', inStockOnly: false, search: '', sort: 'featured' };
-    $$('#categoryFilters input[type="checkbox"]').forEach(cb => cb.checked = false);
-    $('#priceFilter').value = '';
-    $('#inStockOnly').checked = false;
-    $('#sortSelect').value = 'featured';
-    $('#searchInput').value = '';
+  /**
+   * Réinitialise tous les filtres à leurs valeurs par défaut
+   */
+  const resetFilters = () => {
+    // Reset état
+    state.filters = {
+      categories: [],
+      priceRange: '',
+      inStockOnly: false,
+      search: '',
+      sort: 'featured'
+    };
+
+    // Reset UI
+    $$('#categoryFilters input[type="checkbox"]').forEach((cb) => (cb.checked = false));
+    const priceFilter = $('#priceFilter');
+    if (priceFilter) priceFilter.value = '';
+    const inStockOnly = $('#inStockOnly');
+    if (inStockOnly) inStockOnly.checked = false;
+    const sortSelect = $('#sortSelect');
+    if (sortSelect) sortSelect.value = 'featured';
+    const searchInput = $('#searchInput');
+    if (searchInput) searchInput.value = '';
+
     applyFilters();
-  }
+  };
 
-  function applyFilters() {
+  /**
+   * Applique tous les filtres actifs + tri, puis rafraîchit la grille
+   */
+  const applyFilters = () => {
     let filtered = [...state.products];
 
+    // ─────────────────────────────────────────────────────────────────
+    // Filtre recherche textuelle
+    // ─────────────────────────────────────────────────────────────────
     if (state.filters.search) {
-      filtered = filtered.filter(p => p.name.toLowerCase().includes(state.filters.search));
+      filtered = filtered.filter((product) =>
+        product.name.toLowerCase().includes(state.filters.search)
+      );
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Filtre catégories (ET logique si plusieurs cochées)
+    // ─────────────────────────────────────────────────────────────────
     if (state.filters.categories.length > 0) {
-      filtered = filtered.filter(p => state.filters.categories.includes(p.category));
+      filtered = filtered.filter((product) =>
+        state.filters.categories.includes(product.category)
+      );
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Filtre prix (range)
+    // ─────────────────────────────────────────────────────────────────
     if (state.filters.priceRange) {
       const range = state.filters.priceRange;
+
       if (range.includes('-')) {
+        // Ex: "20000-49999"
         const [min, max] = range.split('-').map(Number);
-        filtered = filtered.filter(p => p.price >= min && p.price <= max);
+        filtered = filtered.filter((p) => p.price >= min && p.price <= max);
       } else if (range.endsWith('+')) {
+        // Ex: "100000+"
         const min = Number(range.replace('+', ''));
-        filtered = filtered.filter(p => p.price >= min);
+        filtered = filtered.filter((p) => p.price >= min);
       }
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Filtre stock (afficher uniquement produits disponibles)
+    // ─────────────────────────────────────────────────────────────────
     if (state.filters.inStockOnly) {
-      filtered = filtered.filter(p => p.stock > 0);
+      filtered = filtered.filter((product) => product.stock > 0);
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Tri
+    // ─────────────────────────────────────────────────────────────────
     switch (state.filters.sort) {
-      case 'price-asc': filtered.sort((a, b) => a.price - b.price); break;
-      case 'price-desc': filtered.sort((a, b) => b.price - a.price); break;
-      case 'newest': filtered.sort((a, b) => (b.new ? 1 : 0) - (a.new ? 1 : 0)); break;
-      default: filtered.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0)); break;
+      case 'price-asc':
+        filtered.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-desc':
+        filtered.sort((a, b) => b.price - a.price);
+        break;
+      case 'newest':
+        filtered.sort((a, b) => (b.new ? 1 : 0) - (a.new ? 1 : 0));
+        break;
+      case 'featured':
+      default:
+        filtered.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+        break;
     }
 
     state.filteredProducts = filtered;
     renderProducts();
-  }
+  };
 
-  /* ==================== RENDER PRODUCTS ==================== */
-  function renderProducts() {
+  // ═══════════════════════════════════════════════════════════════════════
+  // 7. RENDU PRODUITS
+  // Affiche la grille de produits (avec sécurité XSS)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Affiche la grille de produits filtrés
+   */
+  const renderProducts = () => {
     const grid = $('#productsGrid');
     const resultsCount = $('#resultsCount');
-    if (!grid) return;
+    if (!grid || !resultsCount) return;
 
     const count = state.filteredProducts.length;
     resultsCount.textContent = `${count} produit${count > 1 ? 's' : ''}`;
 
+    // ─────────────────────────────────────────────────────────────────
+    // Cas aucun résultat
+    // ─────────────────────────────────────────────────────────────────
     if (count === 0) {
       grid.innerHTML = `
         <div style="grid-column: 1/-1; text-align: center; padding: 48px; color: var(--muted);">
-          <div style="font-size: 48px; margin-bottom: 16px;">😔</div>
+          <div style="font-size: 48px; margin-bottom: 16px;" aria-hidden="true">😔</div>
           <div style="font-size: 18px; font-weight: 600;">Aucun produit trouvé</div>
-          <button class="btn-text" onclick="document.getElementById('resetFilters').click()" style="margin-top: 12px;">
+          <button class="btn-text" id="resetFromEmpty" style="margin-top: 12px;">
             Réinitialiser les filtres
           </button>
         </div>
       `;
+
+      // Réattacher événement (car innerHTML a tout remplacé)
+      $('#resetFromEmpty')?.addEventListener('click', resetFilters);
       return;
     }
 
-    grid.innerHTML = state.filteredProducts.map(product => {
-      const inWishlist = state.wishlist.includes(product.id);
-      const inStock = product.stock > 0;
-      return `
-        <div class="product-card">
-          <div class="product-image">${product.emoji}</div>
+    // ─────────────────────────────────────────────────────────────────
+    // Rendu cartes produits (avec escapeHTML pour sécurité)
+    // ─────────────────────────────────────────────────────────────────
+    grid.innerHTML = state.filteredProducts
+      .map((product) => {
+        const inWishlist = state.wishlist.includes(product.id);
+        const inStock = product.stock > 0;
+
+        // Sécuriser données utilisateur
+        const safeName = escapeHTML(product.name);
+        const safeCategory = escapeHTML(getCategoryLabel(product.category));
+
+        return `
+        <article class="product-card">
+          <div class="product-image" aria-hidden="true">${product.emoji}</div>
           <div class="product-info">
             <div class="product-header">
-              <h3 class="product-name">${product.name}</h3>
-              <button class="wishlist-icon ${inWishlist ? 'active' : ''}" data-wishlist="${product.id}">
-                <svg class="icon" fill="${inWishlist ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24">
+              <h3 class="product-name">${safeName}</h3>
+              <button 
+                class="wishlist-icon ${inWishlist ? 'active' : ''}" 
+                data-wishlist="${product.id}"
+                aria-label="${inWishlist ? 'Retirer des favoris' : 'Ajouter aux favoris'}"
+              >
+                <svg class="icon" fill="${inWishlist ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
                 </svg>
               </button>
             </div>
-            <span class="product-category">${getCategoryLabel(product.category)}</span>
+            <span class="product-category">${safeCategory}</span>
             <div class="product-price">${formatPrice(product.price)}</div>
             <div class="product-stock ${inStock ? '' : 'out'}">
               ${inStock ? `✓ En stock (${product.stock})` : '✗ Rupture de stock'}
             </div>
             <div class="product-actions">
-              <button class="btn-add-cart" data-cart="${product.id}" ${!inStock ? 'disabled' : ''}>🛒 Panier</button>
-              <button class="btn-view" data-view="${product.id}">👁️ Voir</button>
+              <button 
+                class="btn-add-cart" 
+                data-cart="${product.id}" 
+                ${!inStock ? 'disabled' : ''}
+                aria-label="Ajouter ${safeName} au panier"
+              >
+                <span aria-hidden="true">🛒</span> Panier
+              </button>
+              <button 
+                class="btn-view" 
+                data-view="${product.id}"
+                aria-label="Voir détails de ${safeName}"
+              >
+                <span aria-hidden="true">👁️</span> Voir
+              </button>
             </div>
           </div>
-        </div>
+        </article>
       `;
-    }).join('');
+      })
+      .join('');
 
-    $$('[data-wishlist]').forEach(btn => btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleWishlist(Number(btn.dataset.wishlist));
-    }));
+    // ─────────────────────────────────────────────────────────────────
+    // Attacher événements (délégation sur boutons nouvellement créés)
+    // ─────────────────────────────────────────────────────────────────
+    $$('[data-wishlist]').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleWishlist(Number(btn.dataset.wishlist));
+      });
+    });
 
-    $$('[data-cart]').forEach(btn => btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      addToCart(Number(btn.dataset.cart));
-    }));
+    $$('[data-cart]').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        addToCart(Number(btn.dataset.cart));
+      });
+    });
 
-    $$('[data-view]').forEach(btn => btn.addEventListener('click', () => {
-      openProductModal(Number(btn.dataset.view));
-    }));
-  }
+    $$('[data-view]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openProductModal(Number(btn.dataset.view));
+      });
+    });
+  };
 
-  /* ==================== MODALS ==================== */
-  function openProductModal(productId) {
-    const product = state.products.find(p => p.id === productId);
+  // ═══════════════════════════════════════════════════════════════════════
+  // 8. MODALS
+  // Détail produit + Panier
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Ouvre la modal de détail d'un produit
+   * @param {number} productId - ID du produit
+   */
+  const openProductModal = (productId) => {
+    const product = state.products.find((p) => p.id === productId);
     if (!product) return;
 
     const modal = $('#productModal');
     const modalBody = $('#modalBody');
+    if (!modal || !modalBody) return;
+
     const inStock = product.stock > 0;
+    const safeName = escapeHTML(product.name);
+    const safeDesc = escapeHTML(product.desc);
+    const safeCategory = escapeHTML(getCategoryLabel(product.category));
 
     modalBody.innerHTML = `
-      <div class="product-detail-image">${product.emoji}</div>
-      <h2 class="product-detail-title">${product.name}</h2>
+      <div class="product-detail-image" aria-hidden="true">${product.emoji}</div>
+      <h2 id="productModalTitle" class="product-detail-title">${safeName}</h2>
       <div class="product-detail-price">${formatPrice(product.price)}</div>
       <div style="margin-bottom: 16px;">
-        <span class="product-category">${getCategoryLabel(product.category)}</span>
+        <span class="product-category">${safeCategory}</span>
         <span class="product-stock ${inStock ? '' : 'out'}" style="margin-left: 12px;">
           ${inStock ? `✓ ${product.stock} en stock` : '✗ Rupture de stock'}
         </span>
       </div>
-      <p class="product-detail-description">${product.desc}</p>
+      <p class="product-detail-description">${safeDesc}</p>
       <div class="product-detail-actions">
-        <button class="btn-block btn-primary" id="modalAddCart" ${!inStock ? 'disabled' : ''}>
-          🛒 Ajouter au panier
+        <button 
+          class="btn-block btn-primary" 
+          id="modalAddCart" 
+          ${!inStock ? 'disabled' : ''}
+          aria-label="Ajouter ${safeName} au panier"
+        >
+          <span aria-hidden="true">🛒</span> Ajouter au panier
         </button>
       </div>
     `;
 
     modal.classList.add('active');
+    modal.removeAttribute('hidden');
 
-    $('#modalAddCart')?.addEventListener('click', () => {
-      addToCart(product.id);
-      closeProductModal();
-    });
-  }
+    // Événement bouton "Ajouter au panier"
+    const addBtn = $('#modalAddCart');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        addToCart(product.id);
+        closeProductModal();
+      });
+    }
+  };
 
-  function closeProductModal() {
-    $('#productModal')?.classList.remove('active');
-  }
+  /**
+   * Ferme la modal détail produit
+   */
+  const closeProductModal = () => {
+    const modal = $('#productModal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.setAttribute('hidden', '');
+    }
+  };
 
-  function openCartModal() {
-    $('#cartModal')?.classList.add('active');
+  /**
+   * Ouvre la modal panier
+   */
+  const openCartModal = () => {
+    const modal = $('#cartModal');
+    if (modal) {
+      modal.classList.add('active');
+      modal.removeAttribute('hidden');
+    }
     renderCart();
-  }
+  };
 
-  function closeCartModal() {
-    $('#cartModal')?.classList.remove('active');
-  }
+  /**
+   * Ferme la modal panier
+   */
+  const closeCartModal = () => {
+    const modal = $('#cartModal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.setAttribute('hidden', '');
+    }
+  };
 
-  function renderCart() {
+  /**
+   * Affiche le contenu de la modal panier
+   */
+  const renderCart = () => {
     const cartItems = $('#cartItems');
     const cartTotal = $('#cartTotal');
+    if (!cartItems || !cartTotal) return;
 
+    // ─────────────────────────────────────────────────────────────────
+    // Cas panier vide
+    // ─────────────────────────────────────────────────────────────────
     if (state.cart.length === 0) {
       cartItems.innerHTML = `
         <div class="cart-empty">
-          <div style="font-size: 48px; margin-bottom: 12px;">🛒</div>
+          <div style="font-size: 48px; margin-bottom: 12px;" aria-hidden="true">🛒</div>
           <div>Votre panier est vide</div>
         </div>
       `;
@@ -339,57 +652,134 @@
       return;
     }
 
-    cartItems.innerHTML = state.cart.map(item => `
-      <div class="cart-item">
-        <div class="cart-item-image">${item.emoji}</div>
-        <div class="cart-item-info">
-          <div class="cart-item-name">${item.name}</div>
-          <div class="cart-item-price">${formatPrice(item.price)}</div>
-          <div class="cart-item-controls">
-            <button class="qty-btn" data-qty-minus="${item.id}">−</button>
-            <span class="qty-value">${item.qty}</span>
-            <button class="qty-btn" data-qty-plus="${item.id}">+</button>
-            <button class="cart-item-remove" data-remove="${item.id}">Retirer</button>
+    // ─────────────────────────────────────────────────────────────────
+    // Rendu items panier (avec escapeHTML)
+    // ─────────────────────────────────────────────────────────────────
+    cartItems.innerHTML = state.cart
+      .map((item) => {
+        const safeName = escapeHTML(item.name);
+        return `
+        <div class="cart-item">
+          <div class="cart-item-image" aria-hidden="true">${item.emoji}</div>
+          <div class="cart-item-info">
+            <div class="cart-item-name">${safeName}</div>
+            <div class="cart-item-price">${formatPrice(item.price)}</div>
+            <div class="cart-item-controls">
+              <button 
+                class="qty-btn" 
+                data-qty-minus="${item.id}"
+                aria-label="Diminuer quantité de ${safeName}"
+              >−</button>
+              <span class="qty-value" aria-live="polite">${item.qty}</span>
+              <button 
+                class="qty-btn" 
+                data-qty-plus="${item.id}"
+                aria-label="Augmenter quantité de ${safeName}"
+              >+</button>
+              <button 
+                class="cart-item-remove" 
+                data-remove="${item.id}"
+                aria-label="Retirer ${safeName} du panier"
+              >Retirer</button>
+            </div>
           </div>
         </div>
-      </div>
-    `).join('');
+      `;
+      })
+      .join('');
 
     cartTotal.textContent = formatPrice(getCartTotal());
 
-    $$('[data-qty-minus]').forEach(btn => btn.addEventListener('click', () => {
-      updateCartQty(Number(btn.dataset.qtyMinus), -1);
-    }));
-
-    $$('[data-qty-plus]').forEach(btn => btn.addEventListener('click', () => {
-      updateCartQty(Number(btn.dataset.qtyPlus), 1);
-    }));
-
-    $$('[data-remove]').forEach(btn => btn.addEventListener('click', () => {
-      removeFromCart(Number(btn.dataset.remove));
-    }));
-  }
-
-  /* ==================== EVENTS ==================== */
-  function bindEvents() {
-    window.addEventListener('scroll', () => {
-      const header = $('#mainHeader');
-      if (window.scrollY > 50) header?.classList.add('scrolled');
-      else header?.classList.remove('scrolled');
+    // ─────────────────────────────────────────────────────────────────
+    // Attacher événements quantités + retrait
+    // ─────────────────────────────────────────────────────────────────
+    $$('[data-qty-minus]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        updateCartQty(Number(btn.dataset.qtyMinus), -1);
+      });
     });
 
-    $('#searchInput')?.addEventListener('input', handleSearch);
+    $$('[data-qty-plus]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        updateCartQty(Number(btn.dataset.qtyPlus), 1);
+      });
+    });
+
+    $$('[data-remove]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        removeFromCart(Number(btn.dataset.remove));
+      });
+    });
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 9. UI COUNTERS & ÉVÉNEMENTS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Met à jour les compteurs header (panier + wishlist)
+   */
+  const updateUICounters = () => {
+    const cartCount = $('#cartCount');
+    const wishlistCount = $('#wishlistCount');
+
+    if (cartCount) {
+      const totalItems = state.cart.reduce((sum, item) => sum + item.qty, 0);
+      cartCount.textContent = totalItems;
+    }
+
+    if (wishlistCount) {
+      wishlistCount.textContent = state.wishlist.length;
+    }
+  };
+
+  /**
+   * Lie tous les événements globaux de l'application
+   */
+  const bindEvents = () => {
+    // ─────────────────────────────────────────────────────────────────
+    // Scroll header (effet sticky)
+    // ─────────────────────────────────────────────────────────────────
+    window.addEventListener('scroll', () => {
+      const header = $('#mainHeader');
+      if (!header) return;
+
+      if (window.scrollY > 50) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+    });
+
+    // ─────────────────────────────────────────────────────────────────
+    // Recherche (debounced 300ms)
+    // ─────────────────────────────────────────────────────────────────
+    const searchInput = $('#searchInput');
+    if (searchInput) {
+      const debouncedSearch = debounce(handleSearch, 300);
+      searchInput.addEventListener('input', debouncedSearch);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Boutons hero
+    // ─────────────────────────────────────────────────────────────────
     $('#shopNowBtn')?.addEventListener('click', () => {
       document.querySelector('.shop-section')?.scrollIntoView({ behavior: 'smooth' });
     });
+
     $('#offersBtn')?.addEventListener('click', () => {
+      // Trier par prix croissant (offres = petits prix)
       state.filters.sort = 'price-asc';
-      $('#sortSelect').value = 'price-asc';
+      const sortSelect = $('#sortSelect');
+      if (sortSelect) sortSelect.value = 'price-asc';
       applyFilters();
     });
 
-    $$('#categoryFilters input[type="checkbox"]').forEach(cb => {
-      cb.addEventListener('change', handleCategoryFilter);
+    // ─────────────────────────────────────────────────────────────────
+    // Filtres
+    // ─────────────────────────────────────────────────────────────────
+    $$('#categoryFilters input[type="checkbox"]').forEach((checkbox) => {
+      checkbox.addEventListener('change', handleCategoryFilter);
     });
 
     $('#priceFilter')?.addEventListener('change', handlePriceFilter);
@@ -397,50 +787,93 @@
     $('#sortSelect')?.addEventListener('change', handleSort);
     $('#resetFilters')?.addEventListener('click', resetFilters);
 
+    // ─────────────────────────────────────────────────────────────────
+    // Header actions
+    // ─────────────────────────────────────────────────────────────────
     $('#cartBtn')?.addEventListener('click', openCartModal);
+
     $('#wishlistBtn')?.addEventListener('click', () => {
-      showToast(`Vous avez ${state.wishlist.length} favoris`, 'success');
+      const count = state.wishlist.length;
+      showToast(`Vous avez ${count} favori${count > 1 ? 's' : ''}`, 'success');
     });
 
+    // ─────────────────────────────────────────────────────────────────
+    // Modals (fermeture)
+    // ─────────────────────────────────────────────────────────────────
     $('#closeProductModal')?.addEventListener('click', closeProductModal);
     $('#closeCartModal')?.addEventListener('click', closeCartModal);
 
-    $$('.modal').forEach(modal => {
-      modal.addEventListener('click', (e) => {
-        if (e.target.classList.contains('modal-overlay')) {
+    // Fermeture par clic overlay
+    $$('.modal').forEach((modal) => {
+      modal.addEventListener('click', (event) => {
+        if (event.target.classList.contains('modal-overlay')) {
           modal.classList.remove('active');
+          modal.setAttribute('hidden', '');
         }
       });
     });
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
+    // Fermeture par Escape
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
         closeProductModal();
         closeCartModal();
       }
     });
 
+    // ─────────────────────────────────────────────────────────────────
+    // Bouton checkout (placeholder)
+    // ─────────────────────────────────────────────────────────────────
     $('#checkoutBtn')?.addEventListener('click', () => {
       if (state.cart.length === 0) {
         showToast('Votre panier est vide', 'error');
         return;
       }
+
+      // Placeholder commande (future intégration paiement)
       showToast('Commande validée ! (Fonctionnalité future)', 'success');
       state.cart = [];
-      updateUI();
+      updateUICounters();
       closeCartModal();
     });
-  }
+  };
 
-  /* ==================== INIT ==================== */
-  function init() {
+  /**
+   * Initialisation principale de l'application
+   * Appelée au chargement DOM
+   */
+  const init = () => {
+    // Charger produits
     state.products = [...PRODUCTS];
     state.filteredProducts = [...PRODUCTS];
-    bindEvents();
-    renderProducts();
-    updateUI();
-    console.log('%c🛍️ Intello Shop Premium', 'color: #06b6d4; font-size: 18px; font-weight: bold;');
-  }
 
-  document.addEventListener('DOMContentLoaded', init);
+    // Lier événements
+    bindEvents();
+
+    // Rendu initial
+    renderProducts();
+    updateUICounters();
+
+    // Log console (branding)
+    console.log(
+      '%c🛍️ Intello Shop Premium',
+      'color: #06b6d4; font-size: 18px; font-weight: bold; padding: 8px; background: rgba(6,182,212,0.1); border-radius: 4px;'
+    );
+    console.log(
+      '%cPrototype E-Commerce — Intello | Données fictives',
+      'color: #9aa3b2; font-size: 12px; padding: 4px;'
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // DÉMARRAGE APPLICATION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Attendre chargement DOM complet
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    // DOM déjà chargé (cas script defer)
+    init();
+  }
 })();
